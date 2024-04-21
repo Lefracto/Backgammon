@@ -1,8 +1,8 @@
 ﻿namespace Core
 {
-    public class FieldPosition
+    public class FieldSegment
     {
-        public FieldPosition()
+        public FieldSegment()
         {
             CountCheckers = 0;
             PlayerId = -1;

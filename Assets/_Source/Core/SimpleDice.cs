@@ -2,6 +2,9 @@
 
 namespace Core
 {
+  /// <summary>
+  /// The class of cubes with N different faces that have equal probability of falling.
+  /// </summary>
   public class SimpleDice : IDice
   {
     private const int MIN_VALUE = 1;
@@ -23,7 +26,7 @@ namespace Core
     }
 
     public int Value { get; private set; }
-
+    
     public void Roll()
     {
       Value = _random.Next(_minValue, _maxValue + 1);

@@ -5,31 +5,20 @@ using Core;
 
 public class GameService : ITurnsReceiver, IGameDataProvider
 {
+  private static readonly (int, int) white_house = (0, 5);
+  private static readonly (int, int) black_house = (12, 17);
+
+  private const int OUT_OF_BOARD = 24;
+
   public event Action<GameData> OnNewGameDataReceived;
 
-  private GameData _actualGameData;
-  private List<IDice> _dices;
+  private readonly GameData _actualData;
+  private readonly List<IDice> _dices;
 
-  public void MakeTurn(int cell, int cubeId)
+  public GameService(IEnumerable<IDice> dices, int countFieldPositions)
   {
-    if (!ValidateTurn(cell, cubeId))
-      return;
-
-    int directionOfMove = (_actualGameData.PlayerIdInTurn & 1) == 0 ? 1 : -1;
-    int destinationCell = cell + directionOfMove * _dices[cubeId].Value;
-
-    _actualGameData.Field[cell].CountCheckers -= 1;
-
-    if (_actualGameData.Field[cell].CountCheckers == 0)
-      _actualGameData.Field[cell].PlayerId = -1;
-
-    _actualGameData.Field[destinationCell].CountCheckers += 1;
-    _actualGameData.Field[destinationCell].PlayerId = _actualGameData.PlayerIdInTurn;
-
-    // - ход сделан, нужно изменить кубик 
-    // _actualGameData.DicesResult[cubeId].Item2 = 1;
-
-    OnNewGameDataReceived?.Invoke(_actualGameData);
+    _dices = dices.ToList();
+    _actualData = new GameData(_dices.Count, countFieldPositions);
   }
 
   public void RollDices()
@@ -37,59 +26,156 @@ public class GameService : ITurnsReceiver, IGameDataProvider
     _dices.ForEach(dice => dice.Roll());
     if (_dices.All(dice => dice.Value == _dices[0].Value))
     {
-      _actualGameData.DicesResult = _dices.Select(dice => (dice.Value, 2)).ToList();
+      _actualData.DicesResult = _dices.Select(dice => (dice.Value, 2)).ToList();
       return;
     }
 
-    _actualGameData.DicesResult = _dices.Select(dice => (dice.Value, 1)).ToList();
-    OnNewGameDataReceived?.Invoke(_actualGameData);
+    _actualData.DicesResult = _dices.Select(dice => (dice.Value, 1)).ToList();
+    OnNewGameDataReceived?.Invoke(_actualData);
   }
 
-  private bool ValidateTurn(int cell, int cubeId)
+  /// <summary>
+  /// Public method for trying to make a turn. It calls validation.
+  /// </summary>
+  /// <param name="cell"> The cell from which try to move the checker. </param>
+  /// <param name="cubeId"> ID of the cube used for the move. </param>
+  public void MakeTurn(int cell, int cubeId)
   {
-    // Use different if's for better readability and debugging|possibility to write messages
+    if (!ValidateTurn(cell, cubeId, out int destinationCell))
+      return;
 
-    if (_dices[cubeId].Value == 0)
+    MoveChecker(cell, destinationCell);
+    OnNewGameDataReceived?.Invoke(_actualData);
+  }
+
+  /// <summary>
+  /// Method for moving checker for some value. It receives only correct arguments!
+  /// </summary>
+  /// <param name="startCell"> The cell from which try to move the checker </param>
+  /// <param name="destinationCell"> The value to which we move the checkbox </param>
+  private void MoveChecker(int startCell, int destinationCell)
+  {
+    _actualData.Field[startCell].CountCheckers--;
+    if (_actualData.Field[startCell].CountCheckers == 0)
+      _actualData.Field[startCell].PlayerId = -1;
+
+    if (destinationCell == OUT_OF_BOARD)
+      return;
+
+    _actualData.Field[destinationCell].CountCheckers++;
+    if (_actualData.Field[destinationCell].CountCheckers == 1)
+      _actualData.Field[destinationCell].PlayerId = _actualData.PlayerIdInTurn;
+  }
+
+  /// <summary>
+  /// Method to validate a move, returns true and destination cell if the move is correct, otherwise -- false.
+  /// </summary>
+  /// <param name="cell"> The cell from which try to move the checker. </param>
+  /// <param name="cubeId"> ID of the cube used for the move. </param>
+  /// <param name="destination"> Variable to transmit via out if the code is correct. </param>
+  /// <returns> True -- turn is valid, otherwise -- false. </returns>
+  private bool ValidateTurn(int cell, int cubeId, out int destination)
+  {
+    destination = -1;
+    if ((IsValidStartCell(cell) && IsValidCube(cubeId)) is false)
       return false;
 
-    if (_actualGameData.Field[cell].CountCheckers == 0)
-      return false;
+    destination = GetDestinationCell(cell, _dices[cubeId].Value);
+    
+    // TODO: add lock check.
+    
+    return destination != -1;
+  }
 
-    if (!IsCellOccupiedByCurrentPlayer(cell) &&
-        !IsDestinationCellValid(cell + _dices[cubeId].Value))
-      return false;
+  /// <summary>
+  /// The method calculates the index on the segment of the field where you want to move
+  /// the checker based on the value of the cube and checker output rules.
+  /// </summary>
+  /// <param name="cell"> The cell from which move the checker. </param>
+  /// <param name="diceValue"> Value on dice. </param>
+  /// <returns> Index of destination segment. </returns>
+  private int GetDestinationCell(int cell, int diceValue)
+  {
+    CheckerPosition position = new(cell, _actualData.PlayerIdInTurn);
+    int destination = position.MoveChecker(diceValue);
 
-
-    int directionOfMove = (_actualGameData.PlayerIdInTurn & 1) == 0 ? 1 : -1;
-    int destinationCell = cell + directionOfMove * _dices[cubeId].Value;
-
-    if (_actualGameData.Field[destinationCell].CountCheckers != 0 &&
-        _actualGameData.Field[destinationCell].PlayerId != _actualGameData.PlayerIdInTurn)
+    if (destination < 0)
     {
-      return false;
+      if (IsAllCheckersInHome() is false)
+        return -1;
+
+      return destination == -1 || IsTheNearestToOutChecker(destination) ? OUT_OF_BOARD : -1;
     }
 
-    // TODO: check for more difficult logic: locking, checkout
+    if (_actualData.Field[destination].CountCheckers != 0 &&
+        _actualData.Field[destination].PlayerId != _actualData.PlayerIdInTurn)
+      return -1;
+
+    return destination;
+  }
+
+  private bool IsGameFinished()
+  {
+    return false;
+  }
+
+  public void InitGame()
+  {
+  }
+
+  private (int, int) GetHouse()
+    => _actualData.PlayerIdInTurn == 0 ? white_house : black_house;
+
+  // Validation methods
+  private bool IsTheNearestToOutChecker(int currentDistance)
+  {
+    (int, int) house = GetHouse();
+    var distances = new List<int>();
+    for (int i = house.Item1; i <= house.Item2; i++)
+    {
+      for (int j = 0; j < _actualData.DicesResult.Count; j++)
+      {
+        if (_actualData.DicesResult[j].Item2 != 0)
+          distances.Add(
+            new CheckerPosition(i, _actualData.PlayerIdInTurn).MoveChecker(_actualData.DicesResult[j].Item1));
+      }
+    }
+
+    return !distances.Any(distance => distance < currentDistance);
+  }
+
+  private bool IsValidStartCell(int cell)
+  {
+    if (cell < 0 || cell > _actualData.Field.Count)
+      return false;
+
+    if (_actualData.Field[cell].CountCheckers == 0)
+      return false;
+
+    return _actualData.Field[cell].PlayerId == _actualData.PlayerIdInTurn;
+  }
+
+  private bool IsValidCube(int cubeId)
+  {
+    if (cubeId < 0 || cubeId > _dices.Count)
+      return false;
+
+    // Check if dice was rolled and if it was used
+    if (_dices[cubeId].Value == 0 || _actualData.DicesResult[cubeId].Item2 == 0)
+      return false;
 
     return true;
   }
 
-  private int GetDestinationCell(int cell, int cubeValue)
+  private bool IsAllCheckersInHome()
   {
-    int destination = cell + cubeValue;
-    if (_actualGameData.PlayerIdInTurn == 0)
+    (int, int) house = GetHouse();
+    for (int i = 0; i < _actualData.Field.Count; i++)
     {
-      // destination = destination > IsPossibleToRemoveChecker() ? 23 : destination;
+      if (_actualData.Field[i].PlayerId == _actualData.PlayerIdInTurn && (i < house.Item1 || i > house.Item2))
+        return false;
     }
 
-    return 0;
+    return true;
   }
-
-  
-  private bool IsCellOccupiedByCurrentPlayer(int cell)
-    => _actualGameData.Field[cell].PlayerId == _actualGameData.PlayerIdInTurn;
-  
-  private bool IsDestinationCellValid(int destinationCell)
-    => _actualGameData.Field[destinationCell].CountCheckers == 0 ||
-       _actualGameData.Field[destinationCell].PlayerId == _actualGameData.PlayerIdInTurn;
 }
