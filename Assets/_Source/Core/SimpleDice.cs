@@ -1,4 +1,6 @@
 ﻿using System;
+using UnityEngine;
+using Random = System.Random;
 
 namespace Core
 {
@@ -20,8 +22,10 @@ namespace Core
       
       if (minValue < MIN_VALUE)
         throw new ArgumentException($"Min value should be greater or equal than {MIN_VALUE}");
-
+      
       Value = 0;
+      _maxValue = minValue;
+      _maxValue = maxValue;
       _random = new Random();
     }
 
@@ -29,7 +33,8 @@ namespace Core
     
     public void Roll()
     {
-      Value = _random.Next(_minValue, _maxValue + 1);
+      // + 1 for min -- test
+      Value = _random.Next(_minValue + 1, _maxValue + 1);
     }
   }
 }

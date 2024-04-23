@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System;
 using Core;
+using Zenject;
 
 public class GameService : ITurnsReceiver, IGameDataProvider
 {
@@ -15,6 +16,7 @@ public class GameService : ITurnsReceiver, IGameDataProvider
   private readonly GameData _actualData;
   private readonly List<IDice> _dices;
 
+  [Inject]
   public GameService(IEnumerable<IDice> dices, int countFieldPositions)
   {
     _dices = dices.ToList();
@@ -87,6 +89,11 @@ public class GameService : ITurnsReceiver, IGameDataProvider
     return destination != -1;
   }
 
+  private bool IsOkayLocking()
+  {
+    return false;
+  }
+  
   /// <summary>
   /// The method calculates the index on the segment of the field where you want to move
   /// the checker based on the value of the cube and checker output rules.
@@ -116,11 +123,22 @@ public class GameService : ITurnsReceiver, IGameDataProvider
 
   private bool IsGameFinished()
   {
+    // TODO: Check for 0 checkers one of players on board. 
     return false;
   }
 
   public void InitGame()
   {
+    // TODO: finish it
+
+    _actualData.Field[23].CountCheckers = 3;
+    _actualData.Field[23].PlayerId = 0;
+
+    //_actualData.NextPlayer();
+    //_actualData.Field[11].CountCheckers = 3;
+    //_actualData.Field[11].PlayerId = 1;
+    
+    OnNewGameDataReceived!.Invoke(_actualData);
   }
 
   private (int, int) GetHouse()
@@ -177,5 +195,10 @@ public class GameService : ITurnsReceiver, IGameDataProvider
     }
 
     return true;
+  }
+
+  private bool IsTherePossibleMove()
+  {
+    return false;
   }
 }

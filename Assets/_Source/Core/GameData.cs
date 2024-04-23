@@ -11,7 +11,8 @@ public class GameData
   // First item is for dice value, second item is for count of using of this dice
   public List<(int, int)> DicesResult { get; set; }
   public List<FieldSegment> Field { get; set; }
-
+  public bool WasHeadMove { get; set; }
+  
   public int CountCheckers(int playerId)
     => Field.Where(position => position.PlayerId == playerId).Sum(position => position.CountCheckers);
   
