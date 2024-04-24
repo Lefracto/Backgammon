@@ -7,23 +7,23 @@ namespace Core
   {
     private int _cell;
     private GameService _service;
-
+    
+    // Set for interface
     [Inject]
     public void Init(GameService service)
-    {
-      // Test
-      _service = service;
-      service.RollDices();
-      service.InitGame();
-      service.MakeTurn(0, 0);
-      service.MakeTurn(0, 1);
-      service.RollDices();
-    }
+      => _service = service;
     
     public void SelectChecker(int cell)
       => _cell = cell;
 
     public void TryToMakeTurn(int cubeId)
-      => _service.MakeTurn(_cell, cubeId);
+    {
+      _service.MakeTurn(_cell, cubeId); 
+    }
+
+    public void StartGame()
+    {
+      _service.InitGame();
+    }
   }
 }

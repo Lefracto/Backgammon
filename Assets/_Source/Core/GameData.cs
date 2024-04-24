@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Linq;
 using System;
 using Core;
@@ -6,27 +5,28 @@ using Core;
 [Serializable]
 public class GameData
 {
+  private const int START_COUNT_CHECKERS = 30;
   public int PlayerIdInTurn { get; private set; }
-  
-  // First item is for dice value, second item is for count of using of this dice
-  public List<(int, int)> DicesResult { get; set; }
-  public List<FieldSegment> Field { get; set; }
-  public bool WasHeadMove { get; set; }
-  
-  public int CountCheckers(int playerId)
-    => Field.Where(position => position.PlayerId == playerId).Sum(position => position.CountCheckers);
-  
-  public GameData(int countDices, int countFieldPositions)
-  {
-    DicesResult = Enumerable.Repeat((0, 0), countDices).ToList();
-    PlayerIdInTurn = 0;
+  public int[] DicesResult { get; set; }
+  public Checker[] Checkers { get; set; }
+  public bool MayMoveFromHead { get; set; }
 
-    Field = new List<FieldSegment>();
-    for (int i = 0; i < countFieldPositions; i++)
-      Field.Add(new FieldSegment());
+  public int CountCheckers(int playerId)
+    => Checkers.Count(checker => checker.PlayerId == playerId);
+  
+  public GameData()
+  {
+    Checkers = new Checker[START_COUNT_CHECKERS];
+    DicesResult = new[] { 0, 0 };
+    MayMoveFromHead = true;
+    PlayerIdInTurn = 0;
   }
   
   public void NextPlayer()
-    => PlayerIdInTurn = PlayerIdInTurn == 0 ? 1 : 0;
+  {
+    PlayerIdInTurn = PlayerIdInTurn == 0 ? 1 : 0;
+    MayMoveFromHead = true;
+  }
   
+  // TODO: add Service response, last checkers changes, moves counter
 }

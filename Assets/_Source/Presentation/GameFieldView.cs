@@ -1,7 +1,6 @@
 using System.Collections.Generic;
-using Unity.VisualScripting;
+using Core;
 using UnityEngine;
-using UnityEngine.UI;
 using Zenject;
 
 public class GameFieldView : MonoBehaviour
@@ -27,13 +26,10 @@ public class GameFieldView : MonoBehaviour
   private void RedrawField(GameData data)
   {
     ClearField();
-    for (int i = 0; i < _segments.Count; i++)
+    foreach (Checker t in data.Checkers)
     {
-      for (int j = 0; j < data.Field[i].CountCheckers; j++)
-      {
-        GameObject checker = data.Field[i].PlayerId == 0 ? _whiteChecker : _blackChecker;
-        Instantiate(checker, Vector3.zero, Quaternion.identity, _segments[i].transform);
-      }
+      GameObject checker = t.PlayerId == 0 ? _whiteChecker : _blackChecker;
+      Instantiate(checker, Vector3.zero, Quaternion.identity, _segments[t.Position].transform);
     }
   }
 }

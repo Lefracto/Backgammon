@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System;
 using Core;
-using Zenject;
 
 public class GameService : ITurnsReceiver, IGameDataProvider
 {
@@ -11,28 +10,21 @@ public class GameService : ITurnsReceiver, IGameDataProvider
 
   private const int OUT_OF_BOARD = 24;
 
+  private const int WHITE_HEAD = 23;
+  private const int BLACK_HEAD = 11;
+
   public event Action<GameData> OnNewGameDataReceived;
-
   private readonly GameData _actualData;
-  private readonly List<IDice> _dices;
 
-  [Inject]
-  public GameService(IEnumerable<IDice> dices, int countFieldPositions)
+  public GameService()
+    => _actualData = new GameData();
+
+  private void RollDices()
   {
-    _dices = dices.ToList();
-    _actualData = new GameData(_dices.Count, countFieldPositions);
-  }
+    int dice1 = new Random().Next(1, 7);
+    int dice2 = new Random().Next(1, 7);
 
-  public void RollDices()
-  {
-    _dices.ForEach(dice => dice.Roll());
-    if (_dices.All(dice => dice.Value == _dices[0].Value))
-    {
-      _actualData.DicesResult = _dices.Select(dice => (dice.Value, 2)).ToList();
-      return;
-    }
-
-    _actualData.DicesResult = _dices.Select(dice => (dice.Value, 1)).ToList();
+    _actualData.DicesResult = dice1 == dice2 ? new[] { dice1, dice1, dice2, dice2 } : new[] { dice1, dice2 };
     OnNewGameDataReceived?.Invoke(_actualData);
   }
 
@@ -43,30 +35,39 @@ public class GameService : ITurnsReceiver, IGameDataProvider
   /// <param name="cubeId"> ID of the cube used for the move. </param>
   public void MakeTurn(int cell, int cubeId)
   {
-    if (!ValidateTurn(cell, cubeId, out int destinationCell))
+    // Validation
+    if (ValidateTurn(cell, cubeId, out int destinationCell) is false)
       return;
 
-    MoveChecker(cell, destinationCell);
+    // Calculating queue number for checker
+    Checker startChecker = _actualData.Checkers.FirstOrDefault(checker => checker.Position == cell);
+    var checkersOnDestination = _actualData.Checkers.Where(checker => checker.Position == destinationCell).ToArray();
+
+    if (checkersOnDestination.Any())
+      startChecker!.QueueNumber = checkersOnDestination.Max(checker => checker.QueueNumber) + 1;
+    else
+      startChecker!.QueueNumber = 0;
+
+    // Check for head move
+    if (startChecker.Position is WHITE_HEAD or BLACK_HEAD)
+    {
+      // TODO: add check for the first move
+      _actualData.MayMoveFromHead = false;
+    }
+
+    // Change position
+    startChecker!.Position = destinationCell;
+    _actualData.DicesResult[cubeId] = 0;
+
+
+    // Update dices and switch the player
+    if (_actualData.DicesResult.All(dice => dice == 0))
+    {
+      _actualData.NextPlayer();
+      RollDices();
+    }
+
     OnNewGameDataReceived?.Invoke(_actualData);
-  }
-
-  /// <summary>
-  /// Method for moving checker for some value. It receives only correct arguments!
-  /// </summary>
-  /// <param name="startCell"> The cell from which try to move the checker </param>
-  /// <param name="destinationCell"> The value to which we move the checkbox </param>
-  private void MoveChecker(int startCell, int destinationCell)
-  {
-    _actualData.Field[startCell].CountCheckers--;
-    if (_actualData.Field[startCell].CountCheckers == 0)
-      _actualData.Field[startCell].PlayerId = -1;
-
-    if (destinationCell == OUT_OF_BOARD)
-      return;
-
-    _actualData.Field[destinationCell].CountCheckers++;
-    if (_actualData.Field[destinationCell].CountCheckers == 1)
-      _actualData.Field[destinationCell].PlayerId = _actualData.PlayerIdInTurn;
   }
 
   /// <summary>
@@ -82,29 +83,35 @@ public class GameService : ITurnsReceiver, IGameDataProvider
     if ((IsValidStartCell(cell) && IsValidCube(cubeId)) is false)
       return false;
 
-    destination = GetDestinationCell(cell, _dices[cubeId].Value);
-    
-    // TODO: add lock check.
-    
+    destination = GetDestinationCell(cell, _actualData.DicesResult[cubeId]);
+
+    if (cell is BLACK_HEAD or WHITE_HEAD &&
+        _actualData.MayMoveFromHead is false)
+      return false;
+
+    if (IsOkayLocking(cell, destination) is false)
+      return false;
+
     return destination != -1;
   }
 
-  private bool IsOkayLocking()
+  private bool IsOkayLocking(int cell, int destination)
   {
-    return false;
+    // TODO: add lock check.
+    // проверка на то, что после запираения есть хоть одна фишка соперника
+    return true;
   }
-  
+
   /// <summary>
   /// The method calculates the index on the segment of the field where you want to move
-  /// the checker based on the value of the cube and checker output rules.
+  /// the checker based on the value of the cube and checker output rules. Only correct parameters!!! 
   /// </summary>
   /// <param name="cell"> The cell from which move the checker. </param>
   /// <param name="diceValue"> Value on dice. </param>
   /// <returns> Index of destination segment. </returns>
   private int GetDestinationCell(int cell, int diceValue)
   {
-    CheckerPosition position = new(cell, _actualData.PlayerIdInTurn);
-    int destination = position.MoveChecker(diceValue);
+    int destination = MoveChecker(cell, diceValue);
 
     if (destination < 0)
     {
@@ -114,8 +121,8 @@ public class GameService : ITurnsReceiver, IGameDataProvider
       return destination == -1 || IsTheNearestToOutChecker(destination) ? OUT_OF_BOARD : -1;
     }
 
-    if (_actualData.Field[destination].CountCheckers != 0 &&
-        _actualData.Field[destination].PlayerId != _actualData.PlayerIdInTurn)
+    Checker checker = _actualData.Checkers.FirstOrDefault(checker => checker.Position == destination);
+    if (checker != null && checker.PlayerId != _actualData.PlayerIdInTurn)
       return -1;
 
     return destination;
@@ -123,82 +130,130 @@ public class GameService : ITurnsReceiver, IGameDataProvider
 
   private bool IsGameFinished()
   {
-    // TODO: Check for 0 checkers one of players on board. 
-    return false;
+    var whiteCheckers = _actualData.Checkers.Where(checker => checker.PlayerId == 0);
+    var blackCheckers = _actualData.Checkers.Where(checker => checker.PlayerId == 1);
+
+    return whiteCheckers.All(checker => checker.Position == OUT_OF_BOARD) ||
+           blackCheckers.All(checker => checker.Position == OUT_OF_BOARD);
   }
 
   public void InitGame()
   {
-    // TODO: finish it
+    // TODO: Should I make a method for deleting duplicating of code?
+    // TODO: Make constants
 
-    _actualData.Field[23].CountCheckers = 3;
-    _actualData.Field[23].PlayerId = 0;
+    // Initialising white checkers
+    for (int i = 0; i < 15; i++)
+    {
+      _actualData.Checkers[i] = new Checker(WHITE_HEAD, 0)
+      {
+        QueueNumber = i
+      };
+    }
 
-    //_actualData.NextPlayer();
-    //_actualData.Field[11].CountCheckers = 3;
-    //_actualData.Field[11].PlayerId = 1;
-    
-    OnNewGameDataReceived!.Invoke(_actualData);
+    // Initialising black checkers
+    for (int i = 15; i < 30; i++)
+    {
+      _actualData.Checkers[i] = new Checker(BLACK_HEAD, 1)
+      {
+        QueueNumber = i % 15
+      };
+    }
+
+    RollDices();
   }
 
   private (int, int) GetHouse()
     => _actualData.PlayerIdInTurn == 0 ? white_house : black_house;
-
-  // Validation methods
+  
   private bool IsTheNearestToOutChecker(int currentDistance)
   {
     (int, int) house = GetHouse();
     var distances = new List<int>();
     for (int i = house.Item1; i <= house.Item2; i++)
     {
-      for (int j = 0; j < _actualData.DicesResult.Count; j++)
+      int j;
+      for (j = 0; j < _actualData.DicesResult.Length; j++)
       {
-        if (_actualData.DicesResult[j].Item2 != 0)
-          distances.Add(
-            new CheckerPosition(i, _actualData.PlayerIdInTurn).MoveChecker(_actualData.DicesResult[j].Item1));
+        int t = _actualData.DicesResult[j];
+        if (t != 0)
+          distances.Add(MoveChecker(i, t));
       }
     }
 
-    return !distances.Any(distance => distance < currentDistance);
+    return distances.Any(distance => distance < currentDistance) is false;
   }
 
   private bool IsValidStartCell(int cell)
   {
-    if (cell < 0 || cell > _actualData.Field.Count)
+    if (cell is < 0 or > 23)
       return false;
 
-    if (_actualData.Field[cell].CountCheckers == 0)
+    Checker checker = _actualData.Checkers.FirstOrDefault(checker => checker.Position == cell);
+    if (checker is null)
       return false;
 
-    return _actualData.Field[cell].PlayerId == _actualData.PlayerIdInTurn;
+    return checker.PlayerId == _actualData.PlayerIdInTurn;
   }
 
   private bool IsValidCube(int cubeId)
   {
-    if (cubeId < 0 || cubeId > _dices.Count)
+    if (cubeId < 0 || cubeId > _actualData.DicesResult.Length)
       return false;
 
-    // Check if dice was rolled and if it was used
-    if (_dices[cubeId].Value == 0 || _actualData.DicesResult[cubeId].Item2 == 0)
-      return false;
-
-    return true;
+    return _actualData.DicesResult[cubeId] != 0;
   }
 
   private bool IsAllCheckersInHome()
   {
     (int, int) house = GetHouse();
-    for (int i = 0; i < _actualData.Field.Count; i++)
+    for (int i = 0; i < 30; i++)
     {
-      if (_actualData.Field[i].PlayerId == _actualData.PlayerIdInTurn && (i < house.Item1 || i > house.Item2))
+      if (_actualData.Checkers[i].PlayerId == _actualData.PlayerIdInTurn &&
+          (_actualData.Checkers[i].Position < house.Item1 || _actualData.Checkers[i].Position > house.Item2))
         return false;
     }
 
     return true;
   }
 
+  private int MoveChecker(int startCell, int value)
+  {
+    (int, int) convertedIndex;
+    convertedIndex.Item1 = startCell / 12;
+    convertedIndex.Item2 = startCell - convertedIndex.Item1 * 12;
+
+    convertedIndex.Item2 -= value;
+    switch (convertedIndex.Item2)
+    {
+      case < 0 when convertedIndex.Item1 != _actualData.PlayerIdInTurn:
+        convertedIndex.Item2 += 12;
+        convertedIndex.Item1 = _actualData.PlayerIdInTurn;
+        break;
+      case < 0 when convertedIndex.Item1 == _actualData.PlayerIdInTurn:
+        return convertedIndex.Item2;
+    }
+
+    return convertedIndex.Item1 * 12 + convertedIndex.Item2;
+  }
+
   private bool IsTherePossibleMove()
   {
+    var currentPlayerCheckers =
+      _actualData.Checkers.Where(checker => checker.PlayerId == _actualData.PlayerIdInTurn).ToArray();
+
+    int dice1 = _actualData.DicesResult[0];
+    int dice2 = _actualData.DicesResult[1];
+    
+    for (int i = 0; i < currentPlayerCheckers.Length; i++)
+    {
+      int move1 = GetDestinationCell(_actualData.Checkers[i].Position, dice1);
+      int move2 = GetDestinationCell(_actualData.Checkers[i].Position, dice2);
+
+      if (move1 != -1 || move2 != -1)
+        return true;
+    }
+
     return false;
   }
 }
