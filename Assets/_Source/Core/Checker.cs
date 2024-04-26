@@ -2,13 +2,16 @@
 {
   public class Checker
   {
+    private static int _lastCheckerId;
+    public readonly int PlayerId;
+    public int Id { get; set; }
+    public int Position { get; set; }
+    public int QueueNumber { get; set; }
     public Checker(int position, int playerId)
     {
+      Id = _lastCheckerId++;
       Position = position;
       PlayerId = playerId;
     }
-    public int Position { get; set; }
-    public int QueueNumber { get; set; }
-    public int PlayerId { get; set; }
   }
 }

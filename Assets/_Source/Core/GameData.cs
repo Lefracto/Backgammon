@@ -1,6 +1,7 @@
 using System.Linq;
 using System;
 using Core;
+using ModestTree;
 
 [Serializable]
 public class GameData
@@ -9,8 +10,12 @@ public class GameData
   public int PlayerIdInTurn { get; private set; }
   public int[] DicesResult { get; set; }
   public Checker[] Checkers { get; set; }
+  // transfer to GameService?
   public bool MayMoveFromHead { get; set; }
-
+  public int LastChangedCheckerId { get; set; }
+  public int CountMoves { get; set; }
+  
+  public GameServiceResponse Response { get; set; }  
   public int CountCheckers(int playerId)
     => Checkers.Count(checker => checker.PlayerId == playerId);
   
@@ -21,12 +26,30 @@ public class GameData
     MayMoveFromHead = true;
     PlayerIdInTurn = 0;
   }
+
+  public Checker GetUpperChecker(int cell)
+  {
+    // No MaxBy there =(
+    var checkersOnPosition = Checkers.Where(checker => checker.Position == cell).ToList();
+    if (checkersOnPosition.IsEmpty())
+      return null;
+    
+    Checker maxQueueChecker = checkersOnPosition[0];
+    foreach (Checker t in checkersOnPosition)
+    {
+      if (maxQueueChecker.QueueNumber < t.QueueNumber)
+        maxQueueChecker = t;
+    }
+
+    return maxQueueChecker;
+  }
   
   public void NextPlayer()
   {
     PlayerIdInTurn = PlayerIdInTurn == 0 ? 1 : 0;
+    LastChangedCheckerId = -1;
+    CountMoves++;
     MayMoveFromHead = true;
+    CountMoves = 0;
   }
-  
-  // TODO: add Service response, last checkers changes, moves counter
 }

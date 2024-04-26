@@ -1,29 +1,47 @@
 ﻿using UnityEngine;
 using Zenject;
+using System;
 
 namespace Core
 {
   public class InputHandler : MonoBehaviour
   {
     private int _cell;
+    private ITurnsReceiver _receiver;
+    private GameData _data;
+    
+    // To delete
     private GameService _service;
-    
-    // Set for interface
     [Inject]
-    public void Init(GameService service)
-      => _service = service;
-    
+    public void Init(IGameDataProvider provider, ITurnsReceiver receiver, GameService service)
+    {
+      provider.OnNewGameDataReceived += GetGameData;
+      _service = service;
+      _receiver = receiver;
+    }
+
+    private void GetGameData(GameData data)
+      => _data = data;
+
     public void SelectChecker(int cell)
       => _cell = cell;
 
     public void TryToMakeTurn(int cubeId)
     {
-      _service.MakeTurn(_cell, cubeId); 
+      if (_data is null)
+        return;
+      
+      const int countDicesForDouble = 4;
+      if (_data.DicesResult.Length == countDicesForDouble)
+      {
+        int firstNonZeroIndex = Array.FindIndex(_data.DicesResult, x => x != 0);
+        _receiver.MakeTurn(_cell, firstNonZeroIndex);
+      }
+      else
+        _receiver.MakeTurn(_cell, cubeId);
     }
 
     public void StartGame()
-    {
-      _service.InitGame();
-    }
+      => _service.InitGame();
   }
 }

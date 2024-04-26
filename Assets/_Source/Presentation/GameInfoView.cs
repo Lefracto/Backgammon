@@ -28,20 +28,14 @@ namespace Presentation
     {
       string text = data.PlayerIdInTurn == 0 ? _whitePlayerText : _blackPlayerText;
       _currentPlayerText.text = text;
-
-      // Need to add check
-
-      Debug.Log(data.DicesResult[0] + " -- " + data.DicesResult[1]);
-
+      
       if (data.DicesResult[0] != 0)
         _dice1.sprite = _diceSprites[data.DicesResult[0] - 1];
 
       if (data.DicesResult[1] != 0)
-      {
         _dice2.sprite = _diceSprites[data.DicesResult[1] - 1];
-      }
 
-      _messageText.text = "Test message!";
+      _messageText.text = data.Response.ToString();
     }
   }
 }

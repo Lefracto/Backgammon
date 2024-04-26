@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-using UnityEngine;
-using Zenject;
+﻿using Zenject;
 
 namespace Core
 {
@@ -9,7 +7,8 @@ namespace Core
     public override void InstallBindings()
     {
       Container.Bind<GameService>().AsSingle().NonLazy();
-      Container.Bind<IGameDataProvider>().To<GameService>().FromResolve();
+      Container.Bind<ITurnsReceiver>().To<GameService>().FromResolve().NonLazy();
+      Container.Bind<IGameDataProvider>().To<GameService>().FromResolve().NonLazy();
     }
   }
 }
