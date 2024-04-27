@@ -24,8 +24,8 @@ public class GameService : ITurnsReceiver, IGameDataProvider
   private void RollDice()
   {
     int die1 = new Random().Next(1, 7);
-    //int die2 = new Random().Next(1, 7);
-    int die2 = die1;
+    int die2 = new Random().Next(1, 7);
+    //int die2 = die1;
 
     // Check for double. According to the backgammon rules, if two are the same, it is 4 moves
     _actualData.DicesResult = die1 == die2 ? new[] { die1, die1, die2, die2 } : new[] { die1, die2 };
@@ -272,8 +272,8 @@ public class GameService : ITurnsReceiver, IGameDataProvider
     const int middleCheckersIndex = 15;
     const int lastCheckersIndex = 30;
 
-    InitializeCheckers(0, 0, startCheckersIndex, middleCheckersIndex);
-    InitializeCheckers(12, 1, middleCheckersIndex, lastCheckersIndex);
+    InitializeCheckers(WHITE_HEAD, 0, startCheckersIndex, middleCheckersIndex);
+    InitializeCheckers(BLACK_HEAD, 1, middleCheckersIndex, lastCheckersIndex);
 
     RollDice();
   }
@@ -443,7 +443,7 @@ public class GameService : ITurnsReceiver, IGameDataProvider
   /// should use the dice with the biggest value.
   /// </summary>
   /// <returns>True -- Player may use this dice, otherwise -- must use another. </returns>
-  private bool CheckForComplicatedSituation()
+  private bool CheckSingleDiceUsage()
   {
     // TODO: Check for using the biggest value and rename method.
     return false;
