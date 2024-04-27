@@ -1,9 +1,8 @@
 using System.Collections.Generic;
 using System.Linq;
+using ModestTree;
 using System;
 using Core;
-using ModestTree;
-using Random = System.Random;
 
 public class GameService : ITurnsReceiver, IGameDataProvider
 {
@@ -24,37 +23,67 @@ public class GameService : ITurnsReceiver, IGameDataProvider
   {
     int dice1 = new Random().Next(1, 7);
     int dice2 = new Random().Next(1, 7);
+    //int dice2 = dice1;
 
     // Check for double. According to the backgammon rules, if two are the same, it is 4 moves
     _actualData.DicesResult = dice1 == dice2 ? new[] { dice1, dice1, dice2, dice2 } : new[] { dice1, dice2 };
+    _actualData.MayMoveFromHead = true;
     OnNewGameDataReceived?.Invoke(_actualData);
   }
 
   private bool IsOkayHeadMove(int startCell)
   {
-    if (_actualData.MayMoveFromHead is false)
+    if (startCell != WHITE_HEAD && startCell != BLACK_HEAD)
+      return true;
+
+    if (_actualData.CountMoves is 0 or 1)
+      return CheckIfSingleCheckerCanMove();
+
+    if (!_actualData.MayMoveFromHead) 
       return false;
-    /*
-if (_actualData.CountMoves is 0 or 1)
-{
-  Checker checker = _actualData.Checkers.FirstOrDefault(checker => checker.Position == startCell);
-  int savedPosition = checker!.Position;
-  var validDices = _actualData.DicesResult.Sum();
-
-  for (int i = 0; i < UPPER; i++)
-  {
-
-  }
-
-  int destination = GetDestinationCell(startCell, )
-}*/
-
-    if (startCell is WHITE_HEAD or BLACK_HEAD)
-      _actualData.MayMoveFromHead = false;
-
+    
+    _actualData.MayMoveFromHead = false;
     return true;
   }
 
+  private bool CheckIfSingleCheckerCanMove()
+  {
+    var checkers = _actualData.Checkers
+      .Where(checker => checker.PlayerId == _actualData.PlayerIdInTurn &&
+                        checker.Position != WHITE_HEAD &&
+                        checker.Position != BLACK_HEAD)
+      .ToArray();
+
+    switch (checkers.Length)
+    {
+      case 0:
+        _actualData.MayMoveFromHead = false;
+        return true;
+      case > 1:
+        return false;
+      default:
+        return CanFullyMoveFromCurrentPosition(checkers[0]);
+    }
+  }
+
+  private bool CanFullyMoveFromCurrentPosition(Checker checker)
+  {
+    int start = checker.Position;
+    int[] nonZeroDicesValues = _actualData.DicesResult.Where(dice => dice != 0).ToArray();
+
+    foreach (int diceValue in nonZeroDicesValues)
+    {
+      int destination = GetDestinationSegmentIndex(start, diceValue);
+      Checker checkerOnDestination = _actualData.Checkers.FirstOrDefault(c => c.Position == destination);
+
+      if (checkerOnDestination != null && checkerOnDestination.PlayerId != _actualData.PlayerIdInTurn)
+        return true;
+
+      start = destination;
+    }
+
+    return false;
+  }
 
   /// <summary>
   /// Public method for trying to make a turn. It calls validation.
@@ -103,7 +132,7 @@ if (_actualData.CountMoves is 0 or 1)
       return;
     }
 
-    while (IsTherePossibleMove() is false)
+    while (IsTherePossibleMoves() is false)
     {
       OnNewGameDataReceived?.Invoke(_actualData);
       _actualData.NextPlayer();
@@ -126,11 +155,7 @@ if (_actualData.CountMoves is 0 or 1)
 
     destination = GetDestinationCell(cell, _actualData.DicesResult[cubeId]);
 
-    if (cell is BLACK_HEAD or WHITE_HEAD &&
-        _actualData.MayMoveFromHead is false)
-      return false;
-
-    if (IsOkayLocking(cell, destination) is false)
+    if (!IsOkayHeadMove(cell) || !IsOkayLocking(cell, destination))
       return false;
 
     return destination != -1;
@@ -174,9 +199,7 @@ if (_actualData.CountMoves is 0 or 1)
     startChecker!.Position = destination;
 
     int i = destination - streakLength;
-    i = Math.Max(0, i);
-
-    for (; i <= destination; i++)
+    for (i = Math.Max(0, i); i <= destination; i++)
     {
       int streak = 0;
       for (int j = i; j < i + streakLength; j++)
@@ -244,28 +267,24 @@ if (_actualData.CountMoves is 0 or 1)
 
   public void InitGame()
   {
-    // TODO: Should I make a method for deleting duplicating of code?
-    // TODO: Make constants
+    const int startCheckersIndex = 0;
+    const int middleCheckersIndex = 15;
+    const int lastCheckersIndex = 30;
 
-    // Initialising white checkers
-    for (int i = 0; i < 15; i++)
-    {
-      _actualData.Checkers[i] = new Checker(WHITE_HEAD, 0)
-      {
-        QueueNumber = i
-      };
-    }
-
-    // Initialising black checkers
-    for (int i = 15; i < 30; i++)
-    {
-      _actualData.Checkers[i] = new Checker(BLACK_HEAD, 1)
-      {
-        QueueNumber = i % 15
-      };
-    }
+    InitializeCheckers(WHITE_HEAD, 0, startCheckersIndex, middleCheckersIndex);
+    InitializeCheckers(BLACK_HEAD, 1, middleCheckersIndex, lastCheckersIndex);
 
     RollDices();
+  }
+
+  private void InitializeCheckers(int head, int playerId, int startIndex, int endIndex)
+  {
+    const int countCheckersForPlayer = 15;
+    for (int i = startIndex; i < endIndex; i++)
+      _actualData.Checkers[i] = new Checker(head, playerId)
+      {
+        QueueNumber = i % countCheckersForPlayer
+      };
   }
 
   private (int, int) GetHouse()
@@ -356,11 +375,11 @@ if (_actualData.CountMoves is 0 or 1)
   }
 
   /// <summary>
-  /// 
+  /// Calculates the index of the segment where the checker will be moved.
   /// </summary>
-  /// <param name="startCell"></param>
-  /// <param name="value"></param>
-  /// <returns></returns>
+  /// <param name="startCell">Current checker cell</param>
+  /// <param name="value">Value of dice, which is going to be used</param>
+  /// <returns>Index of field's segment</returns>
   private int GetDestinationSegmentIndex(int startCell, int value)
   {
     const int halfOfField = 12;
@@ -382,7 +401,7 @@ if (_actualData.CountMoves is 0 or 1)
     return convertedIndex.Item1 * halfOfField + convertedIndex.Item2;
   }
 
-  private bool IsTherePossibleMove()
+  private bool IsTherePossibleMoves()
   {
     int[] uniquePositions = _actualData.Checkers
       .Where(checker => checker.PlayerId == _actualData.PlayerIdInTurn)
@@ -395,24 +414,25 @@ if (_actualData.CountMoves is 0 or 1)
       .Distinct()
       .Select(i => _actualData.DicesResult.IndexOf(i))
       .ToArray();
-
+/*
     foreach (int position in uniquePositions)
     {
       foreach (int diceId in nonZeroDiceIndexes)
       {
-        
+        return true;
       }
     }
 
     _actualData.Response = GameServiceResponse.NoMoves;
-    return false;
+    */
+    return true;
   }
 
   /// <summary>
   /// Method checks situation, when only one move of two is possible and player
   /// should use the dice with the biggest value.
   /// </summary>
-  /// <returns>True -- correct </returns>
+  /// <returns>True -- Player may use this dice, otherwise -- must use another. </returns>
   private bool CheckForComplicatedSituation()
   {
     // TODO: Check for using the biggest value and rename method.
