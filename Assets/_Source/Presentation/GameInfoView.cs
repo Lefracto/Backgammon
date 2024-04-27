@@ -18,6 +18,9 @@ namespace Presentation
 
     [Space(15)] [SerializeField] private TMP_Text _messageText;
     [SerializeField] private TMP_Text _currentPlayerText;
+    [SerializeField] private TMP_Text _countMovesText;
+    [SerializeField] private TMP_Text _mayHeadMoveText;
+
 
     [Inject]
     public void Init(IGameDataProvider provider)
@@ -28,7 +31,7 @@ namespace Presentation
     {
       string text = data.PlayerIdInTurn == 0 ? _whitePlayerText : _blackPlayerText;
       _currentPlayerText.text = text;
-      
+
       if (data.DicesResult[0] != 0)
         _dice1.sprite = _diceSprites[data.DicesResult[0] - 1];
 
@@ -36,6 +39,8 @@ namespace Presentation
         _dice2.sprite = _diceSprites[data.DicesResult[1] - 1];
 
       _messageText.text = data.Response.ToString();
+      _countMovesText.text = data.CountMoves.ToString();
+      _mayHeadMoveText.text = data.MayMoveFromHead ? "Да" : "Нет(кроме первого хода)";
     }
   }
 }

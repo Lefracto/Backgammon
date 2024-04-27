@@ -3,6 +3,8 @@ using System.Linq;
 using ModestTree;
 using System;
 using Core;
+using UnityEngine;
+using Random = System.Random;
 
 public class GameService : ITurnsReceiver, IGameDataProvider
 {
@@ -15,19 +17,18 @@ public class GameService : ITurnsReceiver, IGameDataProvider
 
   public event Action<GameData> OnNewGameDataReceived;
   private readonly GameData _actualData;
-
+  
   public GameService()
     => _actualData = new GameData();
 
-  private void RollDices()
+  private void RollDice()
   {
-    int dice1 = new Random().Next(1, 7);
-    int dice2 = new Random().Next(1, 7);
-    //int dice2 = dice1;
+    int die1 = new Random().Next(1, 7);
+    //int die2 = new Random().Next(1, 7);
+    int die2 = die1;
 
     // Check for double. According to the backgammon rules, if two are the same, it is 4 moves
-    _actualData.DicesResult = dice1 == dice2 ? new[] { dice1, dice1, dice2, dice2 } : new[] { dice1, dice2 };
-    _actualData.MayMoveFromHead = true;
+    _actualData.DicesResult = die1 == die2 ? new[] { die1, die1, die2, die2 } : new[] { die1, die2 };
     OnNewGameDataReceived?.Invoke(_actualData);
   }
 
@@ -39,9 +40,9 @@ public class GameService : ITurnsReceiver, IGameDataProvider
     if (_actualData.CountMoves is 0 or 1)
       return CheckIfSingleCheckerCanMove();
 
-    if (!_actualData.MayMoveFromHead) 
+    if (!_actualData.MayMoveFromHead)
       return false;
-    
+
     _actualData.MayMoveFromHead = false;
     return true;
   }
@@ -109,11 +110,11 @@ public class GameService : ITurnsReceiver, IGameDataProvider
     _actualData.DicesResult[cubeId] = 0;
     _actualData.LastChangedCheckerId = startChecker.Id;
 
-    NextPlayerWithPossibleMoves();
     _actualData.Response = destinationCell == OUT_OF_BOARD
       ? GameServiceResponse.ValidCheckerExit
       : GameServiceResponse.ValidCheckerMove;
 
+    NextPlayerWithPossibleMoves();
     OnNewGameDataReceived?.Invoke(_actualData);
   }
 
@@ -128,7 +129,7 @@ public class GameService : ITurnsReceiver, IGameDataProvider
     if (_actualData.DicesResult.All(value => value == 0))
     {
       _actualData.NextPlayer();
-      RollDices();
+      RollDice();
       return;
     }
 
@@ -136,7 +137,7 @@ public class GameService : ITurnsReceiver, IGameDataProvider
     {
       OnNewGameDataReceived?.Invoke(_actualData);
       _actualData.NextPlayer();
-      RollDices();
+      RollDice();
     }
   }
 
@@ -271,10 +272,10 @@ public class GameService : ITurnsReceiver, IGameDataProvider
     const int middleCheckersIndex = 15;
     const int lastCheckersIndex = 30;
 
-    InitializeCheckers(WHITE_HEAD, 0, startCheckersIndex, middleCheckersIndex);
-    InitializeCheckers(BLACK_HEAD, 1, middleCheckersIndex, lastCheckersIndex);
+    InitializeCheckers(0, 0, startCheckersIndex, middleCheckersIndex);
+    InitializeCheckers(12, 1, middleCheckersIndex, lastCheckersIndex);
 
-    RollDices();
+    RollDice();
   }
 
   private void InitializeCheckers(int head, int playerId, int startIndex, int endIndex)
@@ -307,14 +308,16 @@ public class GameService : ITurnsReceiver, IGameDataProvider
       }
     }
 
-    // add one more check
-    bool isThisNearestChecker = distances.Any(distance => distance > currentDistance) is false;
+    // TODO:  
+    bool isThisNearestChecker =
+      distances.Any(distance => distance > currentDistance) is false;
+
     if (isThisNearestChecker is false)
       _actualData.Response = GameServiceResponse.NotTheShortestWay;
 
     return isThisNearestChecker;
   }
-
+  
   private bool IsValidStartCell(int cell)
   {
     const int lastFieldIndex = 23;
@@ -403,6 +406,9 @@ public class GameService : ITurnsReceiver, IGameDataProvider
 
   private bool IsTherePossibleMoves()
   {
+    // TODO: Fix it.
+    bool mayMoveFromHead = _actualData.MayMoveFromHead;
+    
     int[] uniquePositions = _actualData.Checkers
       .Where(checker => checker.PlayerId == _actualData.PlayerIdInTurn)
       .Select(checker => checker.Position)
@@ -414,18 +420,22 @@ public class GameService : ITurnsReceiver, IGameDataProvider
       .Distinct()
       .Select(i => _actualData.DicesResult.IndexOf(i))
       .ToArray();
-/*
+
     foreach (int position in uniquePositions)
     {
       foreach (int diceId in nonZeroDiceIndexes)
       {
+        int destination = GetDestinationCell(position, _actualData.DicesResult[diceId]);
+        if (!IsOkayHeadMove(position) || !IsOkayLocking(position, destination) || destination == -1) continue;      
+        _actualData.MayMoveFromHead = mayMoveFromHead;
         return true;
       }
     }
 
+    _actualData.MayMoveFromHead = mayMoveFromHead;
     _actualData.Response = GameServiceResponse.NoMoves;
-    */
-    return true;
+    Debug.Log("No move");
+    return false;
   }
 
   /// <summary>
