@@ -3,8 +3,7 @@
   public enum GameServiceResponse
   {
     IncorrectAttemptToMoveFromHead,
-    MustUseTheBiggestDiceValue,
-    MustUseAllDices,
+    MoveDoesNotFollowCorrectness,
     IncorrectAttemptToLock,
     DestinationIsOccupied,
     AttemptToUseUsedDice,

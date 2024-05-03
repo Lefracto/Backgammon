@@ -28,6 +28,8 @@ public class GameService : ITurnsReceiver, IGameDataProvider
     int die2 = new Random().Next(1, 7);
     //int die2 = die1;
 
+    //int die1 = 1;
+    //int die2 = 2;
     // Check for double. According to the backgammon rules, if two are the same, it is 4 moves
     _actualData.DicesResult = die1 == die2 ? new[] { die1, die1, die2, die2 } : new[] { die1, die2 };
     OnNewGameDataReceived?.Invoke(_actualData);
@@ -124,8 +126,18 @@ public class GameService : ITurnsReceiver, IGameDataProvider
     const int blackCheckersSpawn = 11;
 
     InitializeCheckers(whiteCheckersSpawn, 0, startCheckersIndex, middleCheckersIndex);
+    //_actualData.Checkers[14] = new Checker(22, 0)  { QueueNumber = 0 };
+    
     InitializeCheckers(blackCheckersSpawn, 1, middleCheckersIndex, lastCheckersIndex);
 
+    /*
+    for (int i = 15; i < 30; i++)
+    {
+      _actualData.Checkers[i] = new Checker(19 - i % 15, 1)  { QueueNumber = 0 };
+    }
+
+    _actualData.CountMoves = 3;
+    */
     RollDice();
   }
 

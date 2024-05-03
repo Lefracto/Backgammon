@@ -54,4 +54,11 @@ public class GameData
     CountMoves++;
     MayMoveFromHead = true;
   }
+
+  public int[] GetUniquePositions()
+    => Checkers
+      .Where(checker => checker.PlayerId == PlayerIdInTurn)
+      .Select(checker => checker.Position)
+      .Distinct()
+      .ToArray();
 }

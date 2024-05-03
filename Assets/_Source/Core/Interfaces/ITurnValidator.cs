@@ -2,7 +2,7 @@
 {
   public interface ITurnValidator
   {
-    public int ValidateTurn(int cell, int cubeId, GameData data);
+    public int ValidateTurn(int cell, int diceId, GameData data);
     public bool IsTherePossibleMoves();
   }
 }

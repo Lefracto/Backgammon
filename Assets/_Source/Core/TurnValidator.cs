@@ -2,11 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using ModestTree;
-using UnityEngine;
-using Object = UnityEngine.Object;
 
 namespace Core
 {
+  // ReSharper disable once ClassNeverInstantiated.Global
   public class TurnValidator : ITurnValidator
   {
     private static readonly (int, int) white_house = (0, 5);
@@ -16,33 +15,40 @@ namespace Core
     private const int WHITE_HEAD = 23;
     private const int BLACK_HEAD = 11;
 
-    private GameServiceResponse ActualResponse { get; set; }
     private GameData _actualData;
+    private GameServiceResponse ActualResponse { get; set; }
+    private bool _firstHeadMoveStatus;
+    private MoveInfo _lastTestMove;
+
 
     /// <summary>
-    /// Method to validate a move, returns true and destination cell if the move is correct, otherwise -- false.
+    /// The method validates the move according to long backgammon rules.
     /// </summary>
     /// <param name="cell"> The cell from which try to move the checker. </param>
-    /// <param name="cubeId"> ID of the cube used for the move. </param>
-    /// <param name="data"> .... </param>
-    /// <returns> True -- turn is valid, otherwise -- false. </returns>
-    public int ValidateTurn(int cell, int cubeId, GameData data)
+    /// <param name="diceId"> ID of the cube used for the move. </param>
+    /// <param name="data"> Actual GameData with field positions info. </param>
+    /// <returns> true -- turn is valid, otherwise -- false. </returns>
+    public int ValidateTurn(int cell, int diceId, GameData data)
     {
       _actualData = data;
+      _firstHeadMoveStatus = data.MayMoveFromHead;
+
       int possibleDestination = -1;
+
       Func<bool>[] validations =
       {
         () => IsValidStartCell(cell),
-        () => IsValidCube(cubeId),
+        () => IsValidCube(diceId),
         () => IsOkayHeadMove(cell),
-        () => IsOkayLocking(cell, possibleDestination = GetDestinationCell(cell, data.DicesResult[cubeId])),
-        () => IsMoveFollowingCompleteness()
+        () => IsDestinationOkay(possibleDestination = GetDestinationCell(cell, data.DicesResult[diceId])),
+        () => IsOkayLocking(cell, possibleDestination),
+        () => IsMoveFollowingCompleteness(_actualData.Checkers.First(checker => checker.Position == cell),
+          possibleDestination, diceId)
       };
 
-      if (validations.Any(validation => validation() is false))
-        data.Response = ActualResponse;
-
-      return possibleDestination;
+      bool isTurnValid = validations.All(validation => validation());
+      data.Response = ActualResponse;
+      return isTurnValid ? possibleDestination : -1;
     }
 
     /// <summary>
@@ -90,7 +96,7 @@ namespace Core
       return true;
     }
 
-    private bool CheckIfSingleCheckerCanMove()
+    private bool CheckIfSingleCheckerCanMove(bool writeToData = true)
     {
       var checkers = _actualData.Checkers
         .Where(checker => checker.PlayerId == _actualData.PlayerIdInTurn &&
@@ -101,7 +107,8 @@ namespace Core
       switch (checkers.Length)
       {
         case 0:
-          _actualData.MayMoveFromHead = false;
+          if (writeToData)
+            _actualData.MayMoveFromHead = false;
           return true;
         case > 1:
           ActualResponse = GameServiceResponse.IncorrectAttemptToMoveFromHead;
@@ -130,12 +137,7 @@ namespace Core
       return false;
     }
 
-    /// <summary>
-    /// Method checks existing of lock and may player make it. Only correct data!
-    /// </summary>
-    /// <param name="cell">Next move start cell</param>
-    /// <param name="destination">Hypothetical move destination</param>
-    /// <returns>true -- correct move, otherwise -- false</returns>
+    // TODO: fully test
     private bool IsOkayLocking(int cell, int destination)
     {
       int streakStart = FindLock(cell, destination);
@@ -153,6 +155,7 @@ namespace Core
       return false;
     }
 
+    // TODO: fully test
     /// <summary>
     /// Method for searching the streak of 6 checkers in the field, if you make the next move. It gets only correct data!
     /// </summary>
@@ -230,18 +233,11 @@ namespace Core
       }
 
       Checker checker = _actualData.Checkers.FirstOrDefault(checker => checker.Position == cell);
-      if (checker is null)
-      {
-        ActualResponse = GameServiceResponse.IncorrectStartCell;
-        return false;
-      }
+      if (checker is not null && checker.PlayerId == _actualData.PlayerIdInTurn)
+        return true;
 
-      // TODO: Make one condition
-      bool isPlayersChecker = checker.PlayerId == _actualData.PlayerIdInTurn;
-      if (isPlayersChecker)
-        ActualResponse = GameServiceResponse.IncorrectStartCell;
-
-      return isPlayersChecker;
+      ActualResponse = GameServiceResponse.IncorrectStartCell;
+      return false;
     }
 
     private bool IsValidCube(int cubeId)
@@ -279,7 +275,6 @@ namespace Core
       return true;
     }
 
-
     /// <summary>
     /// Calculates the index of the segment where the checker will be moved.
     /// </summary>
@@ -309,7 +304,6 @@ namespace Core
 
     public bool IsTherePossibleMoves()
     {
-      // TODO: Fix it.
       bool mayMoveFromHead = _actualData.MayMoveFromHead;
 
       int[] uniquePositions = _actualData.Checkers
@@ -324,6 +318,7 @@ namespace Core
         .Select(i => _actualData.DicesResult.IndexOf(i))
         .ToArray();
 
+      // TODO: Change double foreach for IsPossibleToUseDice
       foreach (int position in uniquePositions)
       {
         foreach (int diceId in nonZeroDiceIndexes)
@@ -338,7 +333,6 @@ namespace Core
 
       _actualData.MayMoveFromHead = mayMoveFromHead;
       ActualResponse = GameServiceResponse.NoMoves;
-      Debug.Log("No move");
       return false;
     }
 
@@ -347,20 +341,120 @@ namespace Core
     /// Completeness rule: player must use the biggest possible count of points. 
     /// </summary>
     /// <returns>true -- if maintain the rule, otherwise -- false</returns>
-    private bool IsMoveFollowingCompleteness()
+    private bool IsMoveFollowingCompleteness(Checker startChecker, int destination, int diceId)
     {
-      // Общее описание необходимого кода:
-      // Если это последний не использованный кубик, то сразу да
-      // Потом проверка на то, что после хода возможен ход оставшимся кубиком, если да - сразу да
-      // В случае если этот ход блокирует оставшийся/оставшиеся, проверить, есть ли полный ход, если да -- сразу нет
-      // Если полного хода нет, то проверить на то, используется ли наибольшее значение (в плане в итоге, а не в моменте)
-      return true;
+      if (CanMoveBeIncomplete(destination) is false)
+        return true;
+
+      MakeTestMove(startChecker, destination, _actualData.DicesResult[diceId]);
+
+      if (IsRemainingMovePossible())
+      {
+        CancelLastTestMove();
+        return true;
+      }
+
+      if (IsMoveBlockingFullTurn())
+      {
+        CancelLastTestMove();
+        ActualResponse = GameServiceResponse.MoveDoesNotFollowCorrectness;
+        return false;
+      }
+
+      if (IsUsingHighestValueDice(diceId))
+        return true;
+
+      CancelLastTestMove();
+      ActualResponse = GameServiceResponse.MoveDoesNotFollowCorrectness;
+      return false;
+    }
+
+    private bool CanMoveBeIncomplete(int destination)
+    {
+      return !(_actualData.DicesResult.Count(dice => dice != 0) == 1 ||
+               _actualData.DicesResult.Where(dice => dice != 0).Distinct().Count() == 1 ||
+               destination == OUT_OF_BOARD);
+    }
+
+    private bool IsRemainingMovePossible()
+    {
+      int lastNonZeroDiceValue = _actualData.DicesResult.First(dice => dice != 0);
+      return IsPossibleToUseDice(lastNonZeroDiceValue, false);
+    }
+
+    private bool IsMoveBlockingFullTurn()
+    {
+      _actualData.MayMoveFromHead = _firstHeadMoveStatus;
+      bool fullMovePossible = IsFullMovePossible();
+      _actualData.MayMoveFromHead = _firstHeadMoveStatus;
+      return fullMovePossible;
+    }
+
+    private bool IsUsingHighestValueDice(int diceId)
+    {
+      int maxDiceValue = _actualData.DicesResult.Max();
+      int necessaryDiceIndex = _actualData.DicesResult.IndexOf(_actualData.DicesResult.Min());
+      if (IsPossibleToUseDice(maxDiceValue, false))
+        necessaryDiceIndex = _actualData.DicesResult.IndexOf(maxDiceValue);
+      return necessaryDiceIndex == diceId;
     }
 
     private bool IsFullMovePossible()
     {
-      return true;
+      // If there is only one cube left, then the completeness of the stroke is limited to the ability to resemble this cube
+      if (_actualData.DicesResult.Count(dice => dice != 0) == 1)
+        return true;
+
+      var uniqueDiceValues = _actualData.DicesResult.Where(dice => dice != 0).Distinct();
+      foreach (int dieValue in uniqueDiceValues)
+      {
+        if (!IsPossibleToUseDice(dieValue, true) || !IsTherePossibleMoves()) continue;
+        CancelLastTestMove();
+        return true;
+      }
+
+      return false;
     }
+
+    private bool IsPossibleToUseDice(int diceValue, bool makeTurn)
+    {
+      bool mayMoveFromHead = _actualData.MayMoveFromHead;
+      int[] uniquePositions = _actualData.GetUniquePositions();
+
+      foreach (int position in uniquePositions)
+      {
+        int destination = GetDestinationCell(position, diceValue);
+        if (!IsOkayHeadMove(position) || !IsOkayLocking(position, destination) || destination == -1)
+        {
+          _actualData.MayMoveFromHead = mayMoveFromHead;
+          continue;
+        }
+
+        if (makeTurn)
+          MakeTestMove(_actualData.Checkers.First(checker => checker.Position == position), destination, diceValue);
+        return true;
+      }
+
+      return false;
+    }
+
+    private void MakeTestMove(Checker checker, int destination, int diceValue)
+    {
+      _lastTestMove = new MoveInfo(checker.Id, checker.Position, _actualData.MayMoveFromHead, diceValue);
+      checker.Position = destination;
+      _actualData.DicesResult[_actualData.DicesResult.IndexOf(diceValue)] = 0;
+    }
+
+    private void CancelLastTestMove()
+    {
+      _actualData.Checkers.First(checker => checker.Id == _lastTestMove.ChangedCheckerId).Position =
+        _lastTestMove.PreviousPosition;
+      _actualData.MayMoveFromHead = _lastTestMove.HeadMoveStatus;
+      _actualData.DicesResult[_actualData.DicesResult.IndexOf(0)] = _lastTestMove.DiceValue;
+    }
+
+    private bool IsDestinationOkay(int destination)
+      => destination != -1;
 
     private (int, int) GetHouse()
       => _actualData.PlayerIdInTurn == 0 ? white_house : black_house;
