@@ -50,16 +50,29 @@ public class GameService : ITurnsReceiver, IGameDataProvider
       return;
     }
 
-    // Calculating queue number for checker
     Checker startChecker = _actualData.GetUpperChecker(cell);
     Checker destinationChecker = _actualData.GetUpperChecker(destinationCell);
-    startChecker!.QueueNumber = destinationChecker?.QueueNumber + 1 ?? 0;
 
     // Change position
     startChecker!.Position = destinationCell;
     _actualData.DicesResult[cubeId] = 0;
     _actualData.LastChangedCheckerId = startChecker.Id;
 
+    // Calculating queue number with the highest in column status for checker
+    // TODO: check for bug!
+    if (destinationChecker is null)
+    {
+      startChecker.QueueNumber = 0;
+      Checker lastChecker = _actualData.GetUpperChecker(cell);
+      if (lastChecker is not null)
+        lastChecker.IsTheUpperOnPosition.Value = true;
+    }
+    else
+    {
+      destinationChecker.IsTheUpperOnPosition.Value = false;
+      startChecker.QueueNumber = destinationChecker.QueueNumber + 1;
+    }
+    
     // Rider lies =(
     _actualData.Response = destinationCell == OUT_OF_BOARD
       ? GameServiceResponse.ValidCheckerExit
@@ -149,5 +162,6 @@ public class GameService : ITurnsReceiver, IGameDataProvider
       {
         QueueNumber = i % countCheckersForPlayer
       };
+    _actualData.Checkers[endIndex - 1].IsTheUpperOnPosition.Value = true;
   }
 }

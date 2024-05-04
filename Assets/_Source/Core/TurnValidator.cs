@@ -18,7 +18,7 @@ namespace Core
     private GameData _actualData;
     private GameServiceResponse ActualResponse { get; set; }
     private bool _firstHeadMoveStatus;
-    private MoveInfo _lastTestMove;
+    private TestMoveLog _lastTestMove;
 
 
     /// <summary>
@@ -440,7 +440,7 @@ namespace Core
 
     private void MakeTestMove(Checker checker, int destination, int diceValue)
     {
-      _lastTestMove = new MoveInfo(checker.Id, checker.Position, _actualData.MayMoveFromHead, diceValue);
+      _lastTestMove = new TestMoveLog(checker.Id, checker.Position, _actualData.MayMoveFromHead, diceValue);
       checker.Position = destination;
       _actualData.DicesResult[_actualData.DicesResult.IndexOf(diceValue)] = 0;
     }
@@ -455,6 +455,22 @@ namespace Core
 
     private bool IsDestinationOkay(int destination)
       => destination != -1;
+
+    public List<PossibleMove> GetPossibleMoves(int cell, GameData data)
+    {
+      var moves = new List<PossibleMove>();
+      for (int i = 0; i < data.DicesResult.Length; i++)
+      {
+        int destination = ValidateTurn(cell, i, data);
+        if (destination != -1)
+        {
+          // Multiple dice check
+          moves.Add(new PossibleMove(destination, new[] { i }));
+        }
+      }
+
+      return moves;
+    }
 
     private (int, int) GetHouse()
       => _actualData.PlayerIdInTurn == 0 ? white_house : black_house;

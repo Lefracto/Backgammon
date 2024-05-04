@@ -9,7 +9,8 @@ namespace Core
     private int _cell;
     private ITurnsReceiver _receiver;
     private GameData _data;
-    
+      
+      
     // To delete
     private GameService _service;
     [Inject]
@@ -22,10 +23,19 @@ namespace Core
 
     private void GetGameData(GameData data)
       => _data = data;
-
-    public void SelectChecker(int cell)
-      => _cell = cell;
-
+    
+    public void SelectCheckerPosition(int id)
+    {
+      if (_data is null)
+        return;
+      
+      Checker checker = Array.Find(_data.Checkers, x => x.Id == id);
+      if (checker is null)
+        return;
+      
+      _cell = checker.Position;
+    }
+    
     public void TryToMakeTurn(int cubeId)
     {
       if (_data is null)

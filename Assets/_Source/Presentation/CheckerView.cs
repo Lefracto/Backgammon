@@ -1,4 +1,6 @@
-﻿using Core;
+﻿using System;
+using Core;
+using UniRx;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -7,10 +9,9 @@ namespace Presentation
   [RequireComponent(typeof(Button))]
   public class CheckerView : MonoBehaviour
   {
-    // TODO: Use UniRx instead of events
     private Checker _checker;
-    private bool _isHighlighted;
-    private Button _button;
+    [SerializeField] private Button _button;
+    private event Action<int> OnSelectChecker;
 
     [Header("For available to use checker")] [SerializeField]
     private SpriteState _spriteStateForAvailable;
@@ -18,30 +19,35 @@ namespace Presentation
     [Space(20)] [Header("For unavailable to use checker")] [SerializeField]
     private SpriteState _spriteStateForUnavailable;
 
-    private bool _mayBeUsedForMove;
-
-    public bool MayBeUsedForMove
-    {
-      get => _mayBeUsedForMove;
-      set
-      {
-        _button.spriteState = value ? _spriteStateForAvailable : _spriteStateForUnavailable;
-        _mayBeUsedForMove = value;
-      }
-    }
+    private void UpdateSpriteState(bool isAvailable)
+      => _button.spriteState = isAvailable ? _spriteStateForAvailable : _spriteStateForUnavailable;
 
     private void Awake()
     {
-      _button = GetComponent<Button>();
-      MayBeUsedForMove = false;
+      // _button = GetComponent<Button>();
     }
 
-    public void Init(Checker checker)
-      => _checker = checker;
+    public void OnSelect()
+    {
+      Debug.Log($"OnSelect, position -- {_checker.Position}");
+      if (_checker.IsTheUpperOnPosition.Value)
+        OnSelectChecker?.Invoke(_checker.Id);
+    }
+
+    public void Init(Checker checker, Action<int> onSelectChecker)
+    {
+      _checker = checker;
+      _checker.IsTheUpperOnPosition.Subscribe(UpdateSpriteState);
+      OnSelectChecker += onSelectChecker;
+    }
 
     // TODO: For animation
-    public void TransferChecker()
+    public void TransferChecker(Transform newParent)
     {
+      transform.SetParent(newParent);
     }
+
+    public int GetCheckerId()
+      => _checker.Id;
   }
 }

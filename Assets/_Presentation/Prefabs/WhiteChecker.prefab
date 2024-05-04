@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 8826946667152817119}
   - component: {fileID: 7222966808003248603}
   - component: {fileID: 8029898293103377336}
+  - component: {fileID: 2220498487795052787}
   m_Layer: 0
   m_Name: WhiteChecker
   m_TagString: Untagged
@@ -134,13 +135,43 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7dc53a8182a441f2adc3ee90a315acd8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _button: {fileID: 7222966808003248603}
   _spriteStateForAvailable:
-    m_HighlightedSprite: {fileID: 0}
-    m_PressedSprite: {fileID: 21300000, guid: 4af303828de4bda4f99c3103a9b02982, type: 3}
-    m_SelectedSprite: {fileID: 21300000, guid: 4170f15762d749546a91340a97b3bae6, type: 3}
+    m_HighlightedSprite: {fileID: 21300000, guid: a668269b9ef923f4c81bb30782ba069d, type: 3}
+    m_PressedSprite: {fileID: 21300000, guid: 75e83ebbe3f373f41b1e6a71e2658c4b, type: 3}
+    m_SelectedSprite: {fileID: 21300000, guid: 4af303828de4bda4f99c3103a9b02982, type: 3}
     m_DisabledSprite: {fileID: 21300000, guid: 4170f15762d749546a91340a97b3bae6, type: 3}
   _spriteStateForUnavailable:
-    m_HighlightedSprite: {fileID: 0}
-    m_PressedSprite: {fileID: 0}
+    m_HighlightedSprite: {fileID: 21300000, guid: 00279fff40926064a96933139fca85ca, type: 3}
+    m_PressedSprite: {fileID: 21300000, guid: 4170f15762d749546a91340a97b3bae6, type: 3}
     m_SelectedSprite: {fileID: 21300000, guid: 4170f15762d749546a91340a97b3bae6, type: 3}
     m_DisabledSprite: {fileID: 21300000, guid: 4170f15762d749546a91340a97b3bae6, type: 3}
+--- !u!114 &2220498487795052787
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5766220537443600101}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0b148fe25e99eb48b9724523833bab1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Delegates:
+  - eventID: 9
+    callback:
+      m_PersistentCalls:
+        m_Calls:
+        - m_Target: {fileID: 8029898293103377336}
+          m_TargetAssemblyTypeName: Presentation.CheckerView, Assembly-CSharp
+          m_MethodName: OnSelect
+          m_Mode: 1
+          m_Arguments:
+            m_ObjectArgument: {fileID: 0}
+            m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+            m_IntArgument: 0
+            m_FloatArgument: 0
+            m_StringArgument: 
+            m_BoolArgument: 0
+          m_CallState: 2

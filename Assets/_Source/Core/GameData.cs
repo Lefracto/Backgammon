@@ -38,19 +38,16 @@ public class GameData
       return null;
 
     Checker maxQueueChecker = checkersOnPosition[0];
-    foreach (Checker checker in checkersOnPosition)
-    {
-      if (maxQueueChecker.QueueNumber < checker.QueueNumber)
-        maxQueueChecker = checker;
-    }
-
+    foreach (Checker checker in checkersOnPosition.Where(checker => maxQueueChecker.QueueNumber < checker.QueueNumber))
+      maxQueueChecker = checker;
+    
     return maxQueueChecker;
   }
 
   public void NextPlayer()
   {
     PlayerIdInTurn = PlayerIdInTurn == 0 ? 1 : 0;
-    LastChangedCheckerId = -1;
+    //LastChangedCheckerId = -1;
     CountMoves++;
     MayMoveFromHead = true;
   }

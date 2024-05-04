@@ -1,8 +1,8 @@
 ﻿namespace Core
 {
-  public struct MoveInfo
+  public struct TestMoveLog
   {
-    public MoveInfo(int checkerId, int previousPosition, bool headMoveStatus, int diceValue)
+    public TestMoveLog(int checkerId, int previousPosition, bool headMoveStatus, int diceValue)
     {
       ChangedCheckerId = checkerId;
       PreviousPosition = previousPosition;

@@ -1,4 +1,6 @@
-﻿namespace Core
+﻿using UniRx;
+
+namespace Core
 {
   public class Checker
   {
@@ -7,6 +9,9 @@
     public int Id { get; set; }
     public int Position { get; set; }
     public int QueueNumber { get; set; }
+
+    public readonly ReactiveProperty<bool> IsTheUpperOnPosition = new();
+
     public Checker(int position, int playerId)
     {
       Id = _lastCheckerId++;
