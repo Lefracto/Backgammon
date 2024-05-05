@@ -1,4 +1,4 @@
 public interface ITurnsReceiver
 {
-  public void MakeTurn(int cell, int cubeId);
+  public void MakeTurn(int cell, int[] diceId);
 }

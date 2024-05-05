@@ -6,7 +6,7 @@ using Zenject;
 using Core;
 using Presentation;
 
-public class GameFieldView : MonoBehaviour
+public class GameFieldView : MonoBehaviour, IPossibleMovesIndicator
 {
   [SerializeField] private List<Transform> _segments;
   [SerializeField] private Transform[] _checkersOut;
@@ -20,11 +20,15 @@ public class GameFieldView : MonoBehaviour
 
   private List<GameObject> _highLightedCheckers;
   private Action<int> _onSelectCheckerHandler;
-  
+  private Action<int[]> _onAvailableSegmentClickHandler;
+
+
   [Inject]
-  public void Init(IGameDataProvider service, Action<int> onSelectCheckerHandler)
+  public void Init(IGameDataProvider service, Action<int> onSelectCheckerHandler,
+    Action<int[]> onAvailableSegmentClickHandler)
   {
     service.OnNewGameDataReceived += RedrawField;
+    _onAvailableSegmentClickHandler = onAvailableSegmentClickHandler;
     _onSelectCheckerHandler = onSelectCheckerHandler;
     _highLightedCheckers = new List<GameObject>();
   }
@@ -34,13 +38,13 @@ public class GameFieldView : MonoBehaviour
     foreach (Transform t in _segments)
       while (t.childCount != 0)
         DestroyImmediate(t.GetChild(0).gameObject);
-    
+
     foreach (Transform t in _checkersOut)
       while (t.childCount != 0)
         DestroyImmediate(t.GetChild(0).gameObject);
   }
 
-  
+
   private void InitField(GameData data)
   {
     _checkerViews = new List<CheckerView>(24);
@@ -66,9 +70,11 @@ public class GameFieldView : MonoBehaviour
     _firstStart = true;
     ClearField();
   }
-  
+
   private void RedrawField(GameData data)
   {
+    ClearHighlights();
+
     if (_firstStart)
     {
       InitField(data);
@@ -76,29 +82,35 @@ public class GameFieldView : MonoBehaviour
       return;
     }
 
-    ClearHighlights();
-
     if (data.LastChangedCheckerId == -1) return;
     CheckerView changedView = _checkerViews.FirstOrDefault(view => view.GetCheckerId() == data.LastChangedCheckerId);
     int index = data.Checkers.FirstOrDefault(c => c.Id == data.LastChangedCheckerId)!.Position;
     changedView!.TransferChecker(_segments[index]);
   }
 
-  public void HighlightAvailableCheckers(IEnumerable<int> availablePositions)
+  public void HighlightAvailableCheckers(List<PossibleMove> possibleMoves)
   {
-    foreach (int position in availablePositions)
+    foreach (PossibleMove possibleMove in possibleMoves)
     {
-      GameObject highlight = Instantiate(_fieldIndicator, _segments[position].transform.position, Quaternion.identity,
-        _segments[position].transform.parent);
+      GameObject highlight = Instantiate(_fieldIndicator, _segments[possibleMove.Destination].transform.position, Quaternion.identity,
+        _segments[possibleMove.Destination].transform.parent);
       const int upperFieldsIndex = 12;
-      if (position < upperFieldsIndex)
+
+      if (highlight.TryGetComponent(out HighlightButton button))
+      {
+        button.Init(_onAvailableSegmentClickHandler, possibleMove.DiceToUse.ToArray());
+      }
+      else
+        Debug.LogError("Highlight prefab does not contain Button component!");
+
+      if (possibleMove.Destination < upperFieldsIndex)
       {
         highlight.transform.Rotate(new Vector3(0, 0, -180));
         highlight.transform.localPosition += _checkerHighlightOffset;
       }
       else
         highlight.transform.localPosition -= _checkerHighlightOffset;
-      
+
 
       _highLightedCheckers.Add(highlight);
     }

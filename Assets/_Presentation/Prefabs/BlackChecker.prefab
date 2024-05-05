@@ -135,6 +135,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7dc53a8182a441f2adc3ee90a315acd8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _empty: {fileID: 2513300594026189611, guid: 50a0b550aea87d543a0e22e52f669398, type: 3}
   _button: {fileID: 5373044047242858951}
   _spriteStateForAvailable:
     m_HighlightedSprite: {fileID: 21300000, guid: 8032dfb620aa5864f994d7e34bd046c5, type: 3}

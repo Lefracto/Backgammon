@@ -6,7 +6,7 @@ using ModestTree;
 namespace Core
 {
   // ReSharper disable once ClassNeverInstantiated.Global
-  public class TurnValidator : ITurnValidator
+  public class TurnValidator : ITurnValidator, IPossibleMovesProvider
   {
     private static readonly (int, int) white_house = (0, 5);
     private static readonly (int, int) black_house = (12, 17);
@@ -20,6 +20,12 @@ namespace Core
     private bool _firstHeadMoveStatus;
     private TestMoveLog _lastTestMove;
 
+    private readonly Stack<TestMoveLog> _testMovesLogs;
+
+    public TurnValidator()
+    {
+      _testMovesLogs = new Stack<TestMoveLog>();
+    }
 
     /// <summary>
     /// The method validates the move according to long backgammon rules.
@@ -440,33 +446,98 @@ namespace Core
 
     private void MakeTestMove(Checker checker, int destination, int diceValue)
     {
-      _lastTestMove = new TestMoveLog(checker.Id, checker.Position, _actualData.MayMoveFromHead, diceValue);
+      // _lastTestMove = new TestMoveLog(checker.Id, checker.Position, _actualData.MayMoveFromHead, diceValue);
+      _testMovesLogs.Push(new TestMoveLog(checker.Id, checker.Position, _actualData.MayMoveFromHead, diceValue));
+
       checker.Position = destination;
       _actualData.DicesResult[_actualData.DicesResult.IndexOf(diceValue)] = 0;
     }
 
     private void CancelLastTestMove()
     {
-      _actualData.Checkers.First(checker => checker.Id == _lastTestMove.ChangedCheckerId).Position =
-        _lastTestMove.PreviousPosition;
-      _actualData.MayMoveFromHead = _lastTestMove.HeadMoveStatus;
-      _actualData.DicesResult[_actualData.DicesResult.IndexOf(0)] = _lastTestMove.DiceValue;
+      TestMoveLog lastTestMove = _testMovesLogs.Pop();
+
+      _actualData.Checkers.First(checker => checker.Id == lastTestMove.ChangedCheckerId).Position =
+        lastTestMove.PreviousPosition;
+      _actualData.MayMoveFromHead = lastTestMove.HeadMoveStatus;
+      _actualData.DicesResult[_actualData.DicesResult.IndexOf(0)] = lastTestMove.DiceValue;
     }
 
     private bool IsDestinationOkay(int destination)
       => destination != -1;
 
-    public List<PossibleMove> GetPossibleMoves(int cell, GameData data)
+    public IEnumerable<PossibleMove> GetPossibleMoves(int cell, GameData data)
+    {
+      const int normalDiceCount = 2;
+      return data.DicesResult.Length > normalDiceCount
+        ? GetPossibleMovesDouble(cell, data)
+        : GetPossibleMovesNonDouble(cell, data);
+    }
+
+    private IEnumerable<PossibleMove> GetPossibleMovesDouble(int cell, GameData data)
+    {
+      var possibleMoves = new List<PossibleMove>();
+      int dice = data.DicesResult.First(diceValue => diceValue != 0);
+      int[] nonZeroDiceIndexes = data.DicesResult.Select((value, index) => new { value, index })
+        .Where(pair => pair.value != 0)
+        .Select(pair => pair.index).ToArray();
+      int countTestMoves = 0;
+      
+      foreach (int diceId in nonZeroDiceIndexes)
+      {
+        bool headMoveStatus = data.MayMoveFromHead;
+        int destination = ValidateTurn(cell, diceId, data);
+        data.MayMoveFromHead = headMoveStatus;
+
+        if (!IsDestinationOkay(destination))
+        {
+          break;
+        }
+        PossibleMove possibleMove = new(destination,
+          nonZeroDiceIndexes.Take(Array.IndexOf(nonZeroDiceIndexes, diceId) + 1).ToArray());
+        possibleMoves.Add(possibleMove);
+        
+        countTestMoves++;
+        MakeTestMove(data.Checkers.First(checker => checker.Position == cell), destination, dice);
+        cell = destination;
+      }
+
+      for(int i = 0; i < countTestMoves; i++)
+        CancelLastTestMove();
+      
+      return possibleMoves;
+    }
+    
+    private IEnumerable<PossibleMove> GetPossibleMovesNonDouble(int cell, GameData data)
     {
       var moves = new List<PossibleMove>();
       for (int i = 0; i < data.DicesResult.Length; i++)
       {
+        bool headMoveStatus = data.MayMoveFromHead;
         int destination = ValidateTurn(cell, i, data);
-        if (destination != -1)
-        {
-          // Multiple dice check
+        data.MayMoveFromHead = headMoveStatus;
+
+        if (IsDestinationOkay(destination))
           moves.Add(new PossibleMove(destination, new[] { i }));
-        }
+      }
+
+      if (moves.Count == 1) return moves;
+
+      for (int i = 0; i < moves.Count; i++)
+      {
+        int anotherDiceId = moves[i].DiceToUse[0] == 0 ? 1 : 0;
+
+        bool headMoveStatus = data.MayMoveFromHead;
+        MakeTestMove(data.Checkers.First(checker => checker.Position == cell), moves[i].Destination,
+          data.DicesResult[moves[i].DiceToUse[0]]);
+        int destination = ValidateTurn(moves[i].Destination, anotherDiceId, data);
+        data.MayMoveFromHead = headMoveStatus;
+        CancelLastTestMove();
+
+        if (IsDestinationOkay(destination) is false) continue;
+        var dices = new List<int>(moves[i].DiceToUse) { anotherDiceId };
+        moves.Add(new PossibleMove(destination, dices));
+        break;
       }
 
       return moves;

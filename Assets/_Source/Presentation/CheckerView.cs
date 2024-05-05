@@ -1,5 +1,6 @@
 ﻿using System;
 using Core;
+using DG.Tweening;
 using UniRx;
 using UnityEngine;
 using UnityEngine.UI;
@@ -9,6 +10,8 @@ namespace Presentation
   [RequireComponent(typeof(Button))]
   public class CheckerView : MonoBehaviour
   {
+    [SerializeField] private GameObject _empty;
+    
     private Checker _checker;
     [SerializeField] private Button _button;
     private event Action<int> OnSelectChecker;
@@ -21,11 +24,6 @@ namespace Presentation
 
     private void UpdateSpriteState(bool isAvailable)
       => _button.spriteState = isAvailable ? _spriteStateForAvailable : _spriteStateForUnavailable;
-
-    private void Awake()
-    {
-      // _button = GetComponent<Button>();
-    }
 
     public void OnSelect()
     {
@@ -41,10 +39,15 @@ namespace Presentation
       OnSelectChecker += onSelectChecker;
     }
 
-    // TODO: For animation
     public void TransferChecker(Transform newParent)
     {
-      transform.SetParent(newParent);
+      GameObject emptyObject = Instantiate(_empty, newParent);
+      Debug.Log("Transfer");
+      transform.DOMove(emptyObject.transform.position, 2.0f).OnComplete(() =>
+      {
+        transform.SetParent(newParent);
+        Destroy(emptyObject);
+      });
     }
 
     public int GetCheckerId()

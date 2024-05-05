@@ -35,19 +35,33 @@ public class GameService : ITurnsReceiver, IGameDataProvider
     OnNewGameDataReceived?.Invoke(_actualData);
   }
 
+  public void MakeTurn(int cell, int[] diceId)
+  {
+    foreach (int id in diceId)
+    {
+      cell = MakeTurn(cell, id);
+      if (cell != -1) continue;
+      OnNewGameDataReceived?.Invoke(_actualData);
+      break;
+    }
+    
+    NextPlayerWithPossibleMoves();
+    OnNewGameDataReceived?.Invoke(_actualData);
+  }
+  
   /// <summary>
   /// Public method for trying to make a turn. It calls validation.
   /// </summary>
   /// <param name="cell"> The cell from which try to move the checker. </param>
   /// <param name="cubeId"> ID of the cube used for the move. </param>
-  public void MakeTurn(int cell, int cubeId)
+  private int MakeTurn(int cell, int cubeId)
   {
     // Validation
     int destinationCell = _validator.ValidateTurn(cell, cubeId, _actualData);
     if (destinationCell == -1)
     {
-      OnNewGameDataReceived?.Invoke(_actualData);
-      return;
+      //OnNewGameDataReceived?.Invoke(_actualData);
+      return -1;
     }
 
     Checker startChecker = _actualData.GetUpperChecker(cell);
@@ -78,8 +92,9 @@ public class GameService : ITurnsReceiver, IGameDataProvider
       ? GameServiceResponse.ValidCheckerExit
       : GameServiceResponse.ValidCheckerMove;
 
-    NextPlayerWithPossibleMoves();
-    OnNewGameDataReceived?.Invoke(_actualData);
+    //NextPlayerWithPossibleMoves();
+    //OnNewGameDataReceived?.Invoke(_actualData);
+    return destinationCell;
   }
 
   /// <summary>
