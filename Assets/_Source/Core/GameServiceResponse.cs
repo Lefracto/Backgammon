@@ -14,6 +14,6 @@
     ValidCheckerMove,
     UnexpectedError,
     GameFinished,
-    NoMoves,
+    NoMoves
   }
 }

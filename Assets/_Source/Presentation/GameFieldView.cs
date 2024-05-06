@@ -71,6 +71,8 @@ public class GameFieldView : MonoBehaviour, IPossibleMovesIndicator
     ClearField();
   }
 
+  private bool _isAnimationInProcess;
+
   private void RedrawField(GameData data)
   {
     ClearHighlights();
@@ -85,14 +87,27 @@ public class GameFieldView : MonoBehaviour, IPossibleMovesIndicator
     if (data.LastChangedCheckerId == -1) return;
     CheckerView changedView = _checkerViews.FirstOrDefault(view => view.GetCheckerId() == data.LastChangedCheckerId);
     int index = data.Checkers.FirstOrDefault(c => c.Id == data.LastChangedCheckerId)!.Position;
-    changedView!.TransferChecker(_segments[index]);
+    
+    int k = index < 12 ? -1 : 1;
+    
+    if (_isAnimationInProcess is false)
+    {
+      changedView!.TransferChecker(_segments[index], _segments[index].childCount * k);
+      _isAnimationInProcess = true;
+    }
+    else
+    {
+      _isAnimationInProcess = false;
+      
+    }
   }
 
   public void HighlightAvailableCheckers(List<PossibleMove> possibleMoves)
   {
     foreach (PossibleMove possibleMove in possibleMoves)
     {
-      GameObject highlight = Instantiate(_fieldIndicator, _segments[possibleMove.Destination].transform.position, Quaternion.identity,
+      GameObject highlight = Instantiate(_fieldIndicator, _segments[possibleMove.Destination].transform.position,
+        Quaternion.identity,
         _segments[possibleMove.Destination].transform.parent);
       const int upperFieldsIndex = 12;
 

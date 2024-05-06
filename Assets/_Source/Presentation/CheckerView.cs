@@ -10,6 +10,7 @@ namespace Presentation
   [RequireComponent(typeof(Button))]
   public class CheckerView : MonoBehaviour
   {
+    [SerializeField] private Vector3 _queueDelta;
     [SerializeField] private GameObject _empty;
     
     private Checker _checker;
@@ -39,11 +40,17 @@ namespace Presentation
       OnSelectChecker += onSelectChecker;
     }
 
-    public void TransferChecker(Transform newParent)
+    public void TransferChecker(Transform newParent, int queueNumber)
     {
       GameObject emptyObject = Instantiate(_empty, newParent);
+
+      transform.SetParent(transform.parent.parent);
+      //emptyObject.transform.SetParent(emptyObject.transform.parent.parent);
       Debug.Log("Transfer");
-      transform.DOMove(emptyObject.transform.position, 2.0f).OnComplete(() =>
+      Debug.Log($"Animated position - {_empty.transform.localPosition}");
+
+      var position = emptyObject.transform.position += queueNumber * _queueDelta;
+      transform.DOMove(position, 2.0f).OnComplete(() =>
       {
         transform.SetParent(newParent);
         Destroy(emptyObject);
